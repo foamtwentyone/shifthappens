@@ -398,8 +398,8 @@ namespace ShiftHappens
             // hotline
             var hl = new GameObject("hotline").transform; hl.SetParent(root, false); hl.position = A(17.3f, 0, 9.5f);
             Shapes.Box(hl, new Vector3(0, 1.3f, 0), new Vector3(3.6f, 2.6f, 0.4f), Mats.Color(Pal.Ink));
-            Shapes.Sign(hl, "FOREMAN'S HOTLINE", new Vector3(0, 2.4f, -0.22f), new Vector2(3.2f, 0.5f), Pal.Yellow, Pal.Ink);
-            phone = new GameObject("phone").transform; phone.SetParent(hl, false); phone.localPosition = new Vector3(0, 1.55f, -0.3f);
+            Shapes.Sign(hl, "FOREMAN'S HOTLINE", new Vector3(0, 2.4f, 0.22f), new Vector2(3.2f, 0.5f), Pal.Yellow, Pal.Ink, 0); // faces into the dock (north)
+            phone = new GameObject("phone").transform; phone.SetParent(hl, false); phone.localPosition = new Vector3(0, 1.55f, 0.3f);
             Shapes.Box(phone, Vector3.zero, new Vector3(0.6f, 0.5f, 0.25f), Mats.Color(Pal.Red, 0.7f));
             Shapes.Box(phone, new Vector3(0, 0.32f, 0), new Vector3(0.75f, 0.16f, 0.2f), Mats.Color(Pal.Red, 0.7f));
             MakeLever("hotline_out", new Vector3(S["hotline_out"].x, 0, S["hotline_out"].z - 0.6f), Pal.Green, "CLOCK OUT", Pal.Ink);
@@ -613,7 +613,7 @@ namespace ShiftHappens
                             contractTexts[i].color = g.sel == i ? Pal.Red : Pal.Ink;
                         }
                     }
-                    for (int i = 0; i < 3; i++) contractClips[i].localRotation = Quaternion.Euler(0, 180, g.sel == i ? Mathf.Sin(t * 2) * 2 : 0);
+                    for (int i = 0; i < 3; i++) contractClips[i].localRotation = Quaternion.Euler(0, 0, g.sel == i ? Mathf.Sin(t * 2) * 2 : 0);
                 }
                 string lk = $"{g.ledger}|{g.shifts}";
                 if (lk != ledgerKey) { ledgerKey = lk; ledgerText.text = $"COMPANY LEDGER\n${g.ledger:N0}\nSHIFTS {g.shifts}  TIER {g.tier}"; }
