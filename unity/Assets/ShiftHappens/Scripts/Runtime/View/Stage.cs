@@ -54,7 +54,7 @@ namespace ShiftHappens
             sun.color = K.Hex("#ffe9c9");
             sun.intensity = 1.6f;
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.75f;
+            sun.shadowStrength = 0.65f;
             sun.shadowBias = 0.03f; sun.shadowNormalBias = 0.3f;
             sunGo.transform.rotation = Quaternion.Euler(52, -28, 0);
             var fill = new GameObject("Fill").AddComponent<Light>();
@@ -89,6 +89,10 @@ namespace ShiftHappens
         public void ApplyQuality(string q)
         {
             QualitySettings.shadowDistance = q == "high" ? 90 : 60;
+            // URP reads shadow distance from its pipeline asset, not QualitySettings. The menu camera
+            // sits ~45 m from the plant, so a short distance makes the shadow edge crawl across the floor.
+            if (GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset urpAsset)
+                urpAsset.shadowDistance = q == "high" ? 140 : q == "low" ? 60 : 110;
             sun.shadows = q == "low" ? LightShadows.None : LightShadows.Soft;
             var urp = cam.GetUniversalAdditionalCameraData();
             if (urp != null) { urp.renderPostProcessing = q != "low"; urp.antialiasing = q == "low" ? AntialiasingMode.FastApproximateAntialiasing : AntialiasingMode.SubpixelMorphologicalAntiAliasing; }

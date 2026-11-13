@@ -118,7 +118,8 @@ namespace ShiftHappens
                     foreach (int cy in new[] { 35, 99 })
                     {
                         float dx = Mathf.Abs(x - W / 2f);
-                        float lineY = cy - 17 + dx * 1.0f;
+                        // Unity textures start at the bottom row: the tip must sit at the HIGHER v to point forward (+V)
+                        float lineY = cy + 17 - dx * 1.0f;
                         if (Mathf.Abs(y - lineY) < 3.2f && dx < 18) c = Pal.Yellow;
                     }
                     c.a = 1;
