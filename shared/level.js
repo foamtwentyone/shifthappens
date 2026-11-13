@@ -12,12 +12,12 @@
 export const BOUNDS = { minX: -46, maxX: 30, minZ: -22, maxZ: 10 };
 
 export const ZONES = [
-  { id: 'lobby', name: 'BREAK ROOM', x0: -46, x1: -32, z0: -10, z1: 10, floor: '#cdb79e' },
-  { id: 'intake', name: 'INTAKE BAY', x0: -32, x1: -14, z0: -10, z1: 10, floor: '#b9c4c6' },
-  { id: 'sorting', name: 'SORTING HALL', x0: -14, x1: 4, z0: -10, z1: 10, floor: '#c3c9bd' },
-  { id: 'control', name: 'CONTROL ROOM', x0: -14, x1: 4, z0: -22, z1: -10, floor: '#a9b6c2' },
-  { id: 'airlock', name: 'AIRLOCK', x0: 4, x1: 10, z0: -3, z1: 3, floor: '#9aa3a8' },
-  { id: 'dock', name: 'SHIPPING DOCK', x0: 10, x1: 30, z0: -10, z1: 10, floor: '#c9c1ad' },
+  { id: 'lobby', name: 'BREAK ROOM', x0: -46, x1: -32, z0: -10, z1: 10, floor: '#c9a37a' },
+  { id: 'intake', name: 'INTAKE BAY', x0: -32, x1: -14, z0: -10, z1: 10, floor: '#9db2b6' },
+  { id: 'sorting', name: 'SORTING HALL', x0: -14, x1: 4, z0: -10, z1: 10, floor: '#a8b69f' },
+  { id: 'control', name: 'CONTROL ROOM', x0: -14, x1: 4, z0: -22, z1: -10, floor: '#8ea2b4' },
+  { id: 'airlock', name: 'AIRLOCK', x0: 4, x1: 10, z0: -3, z1: 3, floor: '#87939a' },
+  { id: 'dock', name: 'SHIPPING DOCK', x0: 10, x1: 30, z0: -10, z1: 10, floor: '#b6a888' },
 ];
 
 export function zoneAt(x, z) {

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { LevelView } from './levelView.js';
+import { Post } from './post.js';
 import { FX } from './fx.js';
 import { buildWorker, animateWorker, buildCargo, bayBadge, M, outline } from './models.js';
 import { PAL, mat, uniqueMat, labelTex, screenTex } from './tex.js';
@@ -17,13 +19,15 @@ export class Renderer {
     const r = (this.gl = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }));
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 1.05;
+    r.toneMappingExposure = 0.95;
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.applyQuality();
-
     const scene = (this.scene = new THREE.Scene());
     scene.background = new THREE.Color('#0f2a30');
+    // soft studio reflections on every material (image-based lighting)
+    const pmrem = new THREE.PMREMGenerator(r);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environmentIntensity = 0.34;
     scene.fog = new THREE.Fog('#0f2a30', 55, 110);
     this.camera = new THREE.PerspectiveCamera(40, 1, 0.3, 300);
     this.camPos = new THREE.Vector3(-20, 30, 30);
@@ -31,11 +35,13 @@ export class Renderer {
     this.camera.position.copy(this.camPos);
     this.camera.lookAt(this.camTarget);
     this.shake = 0;
+    this.post = new Post(r, scene, this.camera);
+    this.applyQuality();
 
     // lights: soft sky + warm sun + cool fill
-    this.hemi = new THREE.HemisphereLight('#e6f4ff', '#6d6255', 1.15);
+    this.hemi = new THREE.HemisphereLight('#dff0ff', '#5d5246', 0.6);
     scene.add(this.hemi);
-    const sun = (this.sun = new THREE.DirectionalLight('#fff0d8', 2.3));
+    const sun = (this.sun = new THREE.DirectionalLight('#ffe9c9', 2.4));
     sun.position.set(-10, 30, 14);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -81,6 +87,7 @@ export class Renderer {
       const s = q === 'high' ? 4096 : 2048;
       if (this.sun.shadow.mapSize.x !== s) { this.sun.shadow.mapSize.set(s, s); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; }
     }
+    if (this.post) { this.post.setQuality(q); this.post.setSize(innerWidth, innerHeight); }
   }
 
   resize() {
@@ -88,6 +95,7 @@ export class Renderer {
     this.gl.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.post?.setSize(w, h);
   }
 
   // ───────────────────────────── menu diorama ─────────────────────────────
@@ -316,7 +324,10 @@ export class Renderer {
     this.sun.position.set(this.camTarget.x - 10, 30, this.camTarget.z + 14);
     this.sun.target.position.copy(this.camTarget);
     this.fx.update(dt);
-    this.gl.render(this.scene, this.camera);
+    if (this.post.enabled) {
+      const pl = state?.plant;
+      this.post.render(dt, { alarm: pl && (!pl.main || pl.P > 88) ? 1 : 0, dark: state?.game?.dark ? 1 : 0, menu: this.mode === 'menu' });
+    } else this.gl.render(this.scene, this.camera);
   }
 
   updateCamera(state, localIds) {
@@ -342,8 +353,9 @@ export class Renderer {
     const target = black ? 0.12 : dark ? 0.02 : 1;
     this.lightLevel += (target - this.lightLevel) * Math.min(1, dt * 3);
     const L = this.lightLevel;
-    this.hemi.intensity = 0.12 + 1.03 * L;
-    this.sun.intensity = 0.1 + 2.2 * L;
+    this.hemi.intensity = 0.06 + 0.54 * L;
+    this.scene.environmentIntensity = 0.04 + 0.3 * L;
+    this.sun.intensity = 0.1 + 2.3 * L;
     this.fill.intensity = 0.1 + 0.35 * L;
     this.hemi.color.set(black ? '#ff9a9a' : '#e6f4ff');
     // torches (head lamps) for everyone when it's dark

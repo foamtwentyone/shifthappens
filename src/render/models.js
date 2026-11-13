@@ -2,7 +2,7 @@
 // primitives with an inverted-hull ink outline for that toy-like read.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { PAL, mat, uniqueMat, inkMat, faceTex, labelTex } from './tex.js';
+import { PAL, mat, pmat, pbr, uniqueMat, inkMat, faceTex, labelTex } from './tex.js';
 import { BAYS } from '../../shared/constants.js';
 
 const geoCache = new Map();
@@ -95,8 +95,9 @@ function buildHat(kind, color) {
 export function buildWorker(outfit, seed = 0) {
   const color = outfit?.color ?? PAL.orange;
   const root = new THREE.Group();
-  const overall = uniqueMat(color, { rough: 0.75 });
-  const overallDark = uniqueMat(new THREE.Color(color).multiplyScalar(0.72).getStyle(), { rough: 0.8 });
+  const overall = uniqueMat(color, { rough: 0.8 });
+  const overallDark = uniqueMat(new THREE.Color(color).multiplyScalar(0.72).getStyle(), { rough: 0.85 });
+  for (const m of [overall, overallDark]) { m.normalMap = pbr().fabricN; m.normalScale.set(0.6, 0.6); }
   const shirt = mat(PAL.paper, { rough: 0.85 });
   const glove = mat(PAL.yellow, { rough: 0.6 });
   const boot = mat('#3a2a22', { rough: 0.7 });
@@ -284,7 +285,7 @@ export function buildCargo(type) {
   let badgeY = 0.9;
   switch (type) {
     case 'crate': {
-      const b = M(rbox(1.05, 1.05, 1.05, 0.08), mat('#5d7480', { rough: 0.45, metal: 0.3 }));
+      const b = M(rbox(1.05, 1.05, 1.05, 0.08), pmat('#5d7480', 'metal', 1, 1, { rough: 0.8, metal: 0.5 }));
       outline(b, 0.03);
       g.add(b);
       for (const [x, z] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) g.add(M(rbox(0.16, 1.09, 0.16, 0.04), mat(PAL.yellow, { rough: 0.5 }), x * 0.47, 0, z * 0.47));

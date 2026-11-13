@@ -21,9 +21,18 @@ export function mat(color, o = {}) {
     side: o.side ?? THREE.FrontSide, depthWrite: o.depthWrite ?? true,
   });
   if (o.map) m.map = o.map;
+  // every surface gets a little micro-detail (paint orange-peel, wood grain)
+  if (o.pbr !== false && !o.opacity) {
+    const P = pbr();
+    const woody = WOODS.has(color);
+    m.normalMap = woody ? P.woodN : P.paintN;
+    const ns = woody ? 0.7 : 0.35;
+    m.normalScale.set(ns, ns);
+  }
   matCache.set(key, m);
   return m;
 }
+const WOODS = new Set(['#b07a45', '#8a5d33', '#b98a56', '#9a6a3e', '#6e4628', '#a0703f']);
 export function uniqueMat(color, o = {}) {
   return new THREE.MeshStandardMaterial({ color, roughness: o.rough ?? 0.58, metalness: o.metal ?? 0.04, emissive: o.emissive ?? '#000', emissiveIntensity: o.ei ?? 1, transparent: !!o.opacity, opacity: o.opacity ?? 1, map: o.map ?? null });
 }
@@ -55,19 +64,28 @@ function noise(ctx, w, h, amt, seed = 1) {
 }
 
 export function floorTex(color, seed = 3) {
-  const [c, g] = canvas(256, 256);
-  g.fillStyle = color; g.fillRect(0, 0, 256, 256);
-  noise(g, 256, 256, 14, seed);
-  // soft blotches
-  for (let i = 0; i < 18; i++) {
-    g.fillStyle = `rgba(0,0,0,${0.018 + (i % 3) * 0.008})`;
-    g.beginPath(); g.ellipse((i * 97) % 256, (i * 57) % 256, 20 + (i * 13) % 40, 12 + (i * 7) % 30, i, 0, Math.PI * 2); g.fill();
+  // 2×2 tiles per texture, each tile slightly different in tone, worn edges
+  const [c, g] = canvas(512, 512);
+  const base = new THREE.Color(color);
+  let s = seed * 9301 + 49297;
+  const r = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+  for (let ty = 0; ty < 2; ty++) for (let tx = 0; tx < 2; tx++) {
+    const k = 0.93 + r() * 0.12;
+    const col = base.clone().multiplyScalar(k);
+    g.fillStyle = '#' + col.getHexString();
+    g.fillRect(tx * 256, ty * 256, 256, 256);
   }
-  // tile seams
-  g.strokeStyle = 'rgba(30,40,45,0.28)'; g.lineWidth = 3;
-  g.strokeRect(1.5, 1.5, 253, 253);
-  g.strokeStyle = 'rgba(255,255,255,0.18)'; g.lineWidth = 1;
-  g.strokeRect(4, 4, 248, 248);
+  noise(g, 512, 512, 16, seed);
+  for (let i = 0; i < 40; i++) {
+    g.fillStyle = `rgba(40,30,20,${0.02 + r() * 0.035})`;
+    g.beginPath(); g.ellipse(r() * 512, r() * 512, 15 + r() * 60, 10 + r() * 40, r() * 3, 0, Math.PI * 2); g.fill();
+  }
+  for (let ty = 0; ty < 2; ty++) for (let tx = 0; tx < 2; tx++) {
+    g.strokeStyle = 'rgba(25,32,36,0.45)'; g.lineWidth = 4;
+    g.strokeRect(tx * 256 + 2, ty * 256 + 2, 252, 252);
+    g.strokeStyle = 'rgba(255,255,255,0.14)'; g.lineWidth = 2;
+    g.strokeRect(tx * 256 + 6, ty * 256 + 6, 244, 244);
+  }
   return toTex(c);
 }
 
@@ -210,4 +228,164 @@ export function radialTex(inner = 'rgba(255,255,255,1)', outer = 'rgba(255,255,2
   gr.addColorStop(0, inner); gr.addColorStop(1, outer);
   g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
   return new THREE.CanvasTexture(c);
+}
+
+// ───────────────────────────── procedural PBR maps ─────────────────────────────
+// Height fields are painted on canvases and converted to normal maps, so every
+// surface gets real micro-detail (tile seams, pores, rivets, weave, rubber ribs)
+// without any image assets.
+function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+function valueNoise(size, cells, seed) {
+  const r = rng(seed);
+  const g = new Float32Array((cells + 1) * (cells + 1));
+  for (let i = 0; i < g.length; i++) g[i] = r();
+  for (let i = 0; i <= cells; i++) { g[i * (cells + 1) + cells] = g[i * (cells + 1)]; g[cells * (cells + 1) + i] = g[i]; }
+  const out = new Float32Array(size * size);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const fx = (x / size) * cells, fy = (y / size) * cells;
+    const ix = Math.floor(fx), iy = Math.floor(fy);
+    let tx = fx - ix, ty = fy - iy;
+    tx = tx * tx * (3 - 2 * tx); ty = ty * ty * (3 - 2 * ty);
+    const a = g[iy * (cells + 1) + ix], b = g[iy * (cells + 1) + ix + 1], c = g[(iy + 1) * (cells + 1) + ix], d = g[(iy + 1) * (cells + 1) + ix + 1];
+    out[y * size + x] = a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty;
+  }
+  return out;
+}
+function fbm(size, seed, octaves = [[4, 0.5], [8, 0.25], [16, 0.15], [32, 0.1]]) {
+  const out = new Float32Array(size * size);
+  octaves.forEach(([cells, amp], i) => { const n = valueNoise(size, cells, seed + i * 977); for (let k = 0; k < out.length; k++) out[k] += n[k] * amp; });
+  return out;
+}
+
+function heightCanvas(size, fn) {
+  const h = new Float32Array(size * size);
+  fn(h, size);
+  return h;
+}
+
+function toNormalTex(h, size, strength, repeat = true) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  const img = g.createImageData(size, size);
+  const at = (x, y) => h[((y + size) % size) * size + ((x + size) % size)];
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const dx = (at(x + 1, y) - at(x - 1, y)) * strength;
+    const dy = (at(x, y + 1) - at(x, y - 1)) * strength;
+    const l = Math.hypot(dx, dy, 1);
+    const i = (y * size + x) * 4;
+    img.data[i] = ((-dx / l) * 0.5 + 0.5) * 255;
+    img.data[i + 1] = ((dy / l) * 0.5 + 0.5) * 255;
+    img.data[i + 2] = ((1 / l) * 0.5 + 0.5) * 255;
+    img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;
+  if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  return t;
+}
+
+function toGreyTex(v, size, lo = 0, hi = 1) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  const img = g.createImageData(size, size);
+  for (let k = 0; k < v.length; k++) {
+    const x = Math.max(0, Math.min(255, (lo + (hi - lo) * v[k]) * 255));
+    img.data[k * 4] = img.data[k * 4 + 1] = img.data[k * 4 + 2] = x; img.data[k * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  return t;
+}
+
+let PBR = null;
+export function pbr() {
+  if (PBR) return PBR;
+  const S = 256;
+  PBR = {};
+  // concrete tile: pores + soft undulation + seam grooves at the border
+  {
+    const n = fbm(S, 11);
+    const r = rng(5);
+    const h = heightCanvas(S, (h) => {
+      for (let k = 0; k < h.length; k++) h[k] = n[k] * 0.6;
+      for (let i = 0; i < 900; i++) { const x = Math.floor(r() * S), y = Math.floor(r() * S); h[y * S + x] -= 0.6 + r(); }
+      for (let i = 0; i < S; i++) for (const e of [0, 1, 2, S - 3, S - 2, S - 1]) { h[e * S + i] -= 1.2; h[i * S + e] -= 1.2; }
+    });
+    PBR.concreteN = toNormalTex(h, S, 1.6);
+    const rough = fbm(S, 23);
+    PBR.concreteR = toGreyTex(rough, S, 0.6, 1.0);
+  }
+  // painted steel: big panel seams, rivets, dents; roughness has scratches & grime
+  {
+    const n = fbm(S, 31, [[6, 0.4], [24, 0.08]]);
+    const h = heightCanvas(S, (h) => {
+      for (let k = 0; k < h.length; k++) h[k] = n[k] * 0.35;
+      const half = S / 2;
+      for (let i = 0; i < S; i++) for (const e of [0, 1, half - 1, half]) { h[e * S + i] -= 1.4; h[i * S + e] -= 1.4; }
+      for (const cy of [10, half - 10, half + 10, S - 10]) for (const cx of [10, 40, 88, 118, half + 10, half + 40, half + 88, S - 10]) {
+        for (let y = -4; y <= 4; y++) for (let x = -4; x <= 4; x++) { const d = Math.hypot(x, y); if (d < 4) h[((cy + y + S) % S) * S + ((cx + x + S) % S)] += Math.cos((d / 4) * Math.PI / 2) * 1.6; }
+      }
+    });
+    PBR.metalN = toNormalTex(h, S, 1.2);
+    const r = rng(9);
+    const rough = fbm(S, 41);
+    for (let i = 0; i < 70; i++) {
+      let x = r() * S, y = r() * S; const a = r() * Math.PI, len = 10 + r() * 40;
+      for (let t = 0; t < len; t++) { x += Math.cos(a); y += Math.sin(a); rough[(((y | 0) + S) % S) * S + (((x | 0) + S) % S)] *= 0.35; }
+    }
+    PBR.metalR = toGreyTex(rough, S, 0.3, 0.75);
+  }
+  // plaster for upper walls
+  PBR.plasterN = toNormalTex(fbm(S, 51, [[16, 0.3], [64, 0.2]]), S, 1.0);
+  // rubber belt ribs
+  {
+    const n = fbm(S, 61, [[32, 0.15]]);
+    const h = heightCanvas(S, (h) => { for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) h[y * S + x] = n[y * S + x] + (y % 16 < 4 ? -1.2 : 0); });
+    PBR.rubberN = toNormalTex(h, S, 1.4);
+  }
+  // fabric weave for overalls
+  {
+    const h = heightCanvas(S, (h) => { for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) h[y * S + x] = Math.sin(x * 0.8) * Math.sin(y * 0.8 + (Math.floor(x / 4) % 2) * 1.5) * 0.5; });
+    PBR.fabricN = toNormalTex(h, S, 1.0);
+  }
+  // wood grain
+  {
+    const n = fbm(S, 71, [[3, 1], [12, 0.3]]);
+    const h = heightCanvas(S, (h) => { for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) h[y * S + x] = Math.sin(y * 0.35 + n[y * S + x] * 14) * 0.4; });
+    PBR.woodN = toNormalTex(h, S, 1.2);
+  }
+  // generic micro-scratch for plastic / paint
+  PBR.paintN = toNormalTex(fbm(S, 81, [[24, 0.12], [96, 0.08]]), S, 1.0);
+  return PBR;
+}
+
+const pbrCache = new Map();
+// Material with procedural normal/roughness detail; repeat in texture tiles.
+export function pmat(color, kind, rx = 1, ry = 1, o = {}) {
+  const key = `${color}|${kind}|${rx.toFixed(1)}|${ry.toFixed(1)}|${JSON.stringify(o)}`;
+  if (pbrCache.has(key)) return pbrCache.get(key);
+  const P = pbr();
+  const maps = {
+    concrete: [P.concreteN, P.concreteR, 0.55], metal: [P.metalN, P.metalR, 0.6], plaster: [P.plasterN, null, 0.5],
+    rubber: [P.rubberN, null, 0.7], fabric: [P.fabricN, null, 0.6], wood: [P.woodN, null, 0.8], paint: [P.paintN, null, 0.5],
+  }[kind];
+  const m = new THREE.MeshStandardMaterial({
+    color, roughness: o.rough ?? (kind === 'metal' ? 1 : 0.62), metalness: o.metal ?? (kind === 'metal' ? 0.25 : 0.03),
+    emissive: o.emissive ?? '#000', emissiveIntensity: o.ei ?? 1, map: o.map ?? null,
+  });
+  const rep = (t) => { if (!t) return null; const c = t.clone(); c.needsUpdate = true; c.repeat.set(rx, ry); return c; };
+  m.normalMap = rep(maps[0]);
+  m.normalScale.set(maps[2] * (o.ns ?? 1), maps[2] * (o.ns ?? 1));
+  if (maps[1]) m.roughnessMap = rep(maps[1]);
+  if (m.map) { m.map = m.map.clone(); m.map.needsUpdate = true; m.map.repeat.set(rx, ry); m.map.wrapS = m.map.wrapT = THREE.RepeatWrapping; }
+  pbrCache.set(key, m);
+  return m;
 }

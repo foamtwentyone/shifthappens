@@ -33,6 +33,8 @@ class App {
     this.state = null;
     this.input.onPress((code) => this.onKey(code));
     window.__app = this; // handy for debugging / automated checks
+    // input goes out on its own 30 Hz clock so a slow frame rate never drops held buttons
+    setInterval(() => { if (this.session && !this.paused) this.session.sendInputs(this.input); }, 1000 / 30);
     this.showTitle();
     requestAnimationFrame((t) => this.frame(t));
   }
@@ -265,7 +267,6 @@ class App {
         if (g && (g.ph === 'lobby' || g.ph === 'countdown') && !used.includes(dev)) this.addCouch(dev);
         else if (used.includes(dev) && !document.querySelector('.report-wrap')) this.togglePause(); // START on an active pad pauses
       }
-      if (!this.paused) this.session.sendInputs(this.input);
       const st = this.session.state();
       if (st) {
         this.state = st;

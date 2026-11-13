@@ -7,7 +7,7 @@ import {
   BOILER, DOORS, PADS, SPOTS, SKY_DOCK, BOUNDS,
 } from '../../shared/level.js';
 import { BAYS, RIDERS } from '../../shared/constants.js';
-import { PAL, mat, uniqueMat, floorTex, hazardTex, beltTex, labelTex, stencilTex, gaugeTex, screenTex } from './tex.js';
+import { PAL, mat, pmat, pbr, uniqueMat, floorTex, hazardTex, beltTex, labelTex, stencilTex, gaugeTex, screenTex } from './tex.js';
 import { M, outline } from './models.js';
 
 const rb = (w, h, d, r = 0.06) => new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001));
@@ -61,8 +61,7 @@ export class LevelView {
       const w = z.x1 - z.x0, d = z.z1 - z.z0;
       const tex = floorTex(z.floor, z.id.length * 7);
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(w / 2, d / 2);
-      const f = plane(w, d, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }), (z.x0 + z.x1) / 2, 0.001, (z.z0 + z.z1) / 2);
+      const f = plane(w, d, pmat('#ffffff', 'concrete', w / 4, d / 4, { map: tex, rough: 1 }), (z.x0 + z.x1) / 2, 0.001, (z.z0 + z.z1) / 2);
       this.add(f);
     }
     // gap fills between zone floors (under walls)
@@ -86,6 +85,9 @@ export class LevelView {
         g.add(m);
         g.add(M(box(w.w + 0.1, 0.12, w.d + 0.1), trim, 0, w.vh + 0.06, 0));
       } else {
+        const len = Math.max(w.w, w.d);
+        const upper = pmat('#ece4d0', 'plaster', len / 3, Math.max(1, (w.vh - 1.1) / 3), { rough: 0.9 });
+        const lower = pmat(PAL.teal, 'metal', len / 2.5, 0.5, { rough: 0.9 });
         const band = Math.min(1.1, w.vh);
         g.add(M(box(w.w, band, w.d), lower, 0, band / 2, 0, { receive: true }));
         if (w.vh > band) g.add(M(box(w.w, w.vh - band, w.d), upper, 0, band + (w.vh - band) / 2, 0, { receive: true }));
@@ -98,9 +100,9 @@ export class LevelView {
     // sky dock platform
     const s = SKY_DOCK;
     const sd = new THREE.Group();
-    sd.add(M(box(s.x1 - s.x0, s.top, s.z1 - s.z0), mat('#7f8f96', { rough: 0.6 }), 0, s.top / 2, 0, { receive: true }));
+    sd.add(M(box(s.x1 - s.x0, s.top, s.z1 - s.z0), pmat('#7f8f96', 'metal', 4, 1), 0, s.top / 2, 0, { receive: true }));
     const topTex = floorTex('#c7b78f', 9); topTex.wrapS = topTex.wrapT = THREE.RepeatWrapping; topTex.repeat.set(5, 2.5);
-    sd.add(plane(s.x1 - s.x0, s.z1 - s.z0, new THREE.MeshStandardMaterial({ map: topTex, roughness: 0.8 }), 0, s.top + 0.005, 0));
+    sd.add(plane(s.x1 - s.x0, s.z1 - s.z0, pmat('#ffffff', 'concrete', 2.75, 1.25, { map: topTex, rough: 1 }), 0, s.top + 0.005, 0));
     const edge = hz.clone(); edge.needsUpdate = true; edge.repeat.set(10, 1);
     sd.add(plane(s.x1 - s.x0, 0.4, new THREE.MeshStandardMaterial({ map: edge }), 0, s.top + 0.01, (s.z1 - s.z0) / 2 - 0.2));
     // struts on the face
@@ -114,7 +116,52 @@ export class LevelView {
     this.add(skySign);
   }
 
+  buildStructure() {
+    // steel pilasters with bolt plates along the tall walls, plus a kick-plate trim
+    const col = pmat('#2c4a52', 'metal', 0.5, 2, { rough: 0.8, metal: 0.4 });
+    const bolt = mat('#9aa6aa', { metal: 0.6, rough: 0.35 });
+    for (const w of WALLS) {
+      if (w.style !== 'wall' || w.vh < 3) continue;
+      const alongX = w.w > w.d;
+      const len = alongX ? w.w : w.d;
+      const n = Math.floor(len / 6);
+      for (let i = 1; i <= n; i++) {
+        const t = -len / 2 + (i * len) / (n + 1);
+        const x = alongX ? w.x + t : w.x;
+        const z = alongX ? w.z : w.z + t;
+        const pil = M(rb(alongX ? 0.45 : 0.75, w.vh, alongX ? 0.75 : 0.45, 0.06), col, x, w.vh / 2, z, { receive: true });
+        this.add(pil);
+        for (const y of [0.35, w.vh - 0.35]) this.add(M(box(alongX ? 0.55 : 0.8, 0.14, alongX ? 0.8 : 0.55), bolt, x, y, z));
+      }
+    }
+  }
+
+  buildWalkways() {
+    // painted pedestrian lanes with stencilled arrows
+    const lane = mat('#ffd447', { rough: 0.7, pbr: false });
+    const line = (x0, z0, x1, z1) => {
+      const len = Math.hypot(x1 - x0, z1 - z0);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(len, 0.12), lane);
+      m.rotation.set(-Math.PI / 2, 0, -Math.atan2(z1 - z0, x1 - x0));
+      m.position.set((x0 + x1) / 2, 0.008, (z0 + z1) / 2);
+      m.receiveShadow = true;
+      this.add(m);
+    };
+    for (const z of [3.4, 5.6]) line(-31, z, -15, z);
+    for (const z of [3.4, 5.6]) line(-13, z, 3, z);
+    for (const z of [7.2, 9.0]) line(11, z, 15.5, z);
+    line(-12.6, -9.5, -12.6, -4); line(-8.4, -9.5, -8.4, -4);
+    // floor drains
+    const grate = mat('#2b3036', { rough: 0.5, metal: 0.4 });
+    for (const [x, z] of [[-20, 6.5], [-2, 4.5], [14, 3.5], [27, 7.5], [-8, -16]]) {
+      this.add(M(box(0.9, 0.02, 0.9), grate, x, 0.01, z, { receive: true }));
+      for (let i = -3; i <= 3; i++) this.add(M(box(0.06, 0.03, 0.8), mat('#4a545a', { metal: 0.5 }), x + i * 0.11, 0.02, z));
+    }
+  }
+
   buildFloorDetails() {
+    this.buildStructure();
+    this.buildWalkways();
     // room name stencils
     const st = (text, x, z, w = 9, rot = 0) => {
       const m = plane(w, w / 4, new THREE.MeshBasicMaterial({ map: stencilTex(text), transparent: true, depthWrite: false }), x, 0.012, z, -Math.PI / 2, rot);
@@ -187,7 +234,7 @@ export class LevelView {
     l.cur += (target - l.cur) * Math.min(1, dt * 14);
     l.pivot.rotation.x = l.cur;
     const c = lampColor ?? (on ? '#49c46b' : '#e8423f');
-    if (l.lampCol !== c) { l.lamp.material.color.set(c); l.lamp.material.emissive.set(c); l.lamp.material.emissiveIntensity = 0.9; l.lampCol = c; }
+    if (l.lampCol !== c) { l.lamp.material.color.set(c); l.lamp.material.emissive.set(c); l.lamp.material.emissiveIntensity = 2.5; l.lampCol = c; }
   }
 
   button(at, color = PAL.red, o = {}) {
@@ -223,13 +270,14 @@ export class LevelView {
       g.position.set((b.x0 + b.x1) / 2, 0, (b.z0 + b.z1) / 2);
       if (horiz) g.rotation.y = -Math.PI / 2; // local +z(-?) => align length along x
       // local frame: length along local z
-      g.add(M(rb(width, b.top - 0.1, len, 0.06), frameM, 0, (b.top - 0.1) / 2, 0, { receive: true }));
+      g.add(M(rb(width, b.top - 0.1, len, 0.06), pmat(PAL.teal, 'metal', 1, len / 2.5, { rough: 0.85 }), 0, (b.top - 0.1) / 2, 0, { receive: true }));
       for (const s of [-1, 1]) g.add(M(rb(0.12, 0.16, len, 0.04), railM, s * (width / 2 + 0.02), b.top + 0.02, 0));
       for (let z = -len / 2 + 0.6; z < len / 2; z += 2.2) for (const s of [-1, 1]) g.add(M(box(0.12, 0.2, 0.12), legM, s * (width / 2 - 0.15), 0.1, z));
       for (const e of [-1, 1]) g.add(M(cyl(0.16, 0.16, width - 0.02, 14), mat('#9aa6aa', { metal: 0.5, rough: 0.3 }), 0, b.top - 0.1, e * (len / 2 - 0.05), { rz: Math.PI / 2 }));
       const tex = beltTex();
       tex.repeat.set(1, len / 1.6);
-      const surf = new THREE.Mesh(new THREE.PlaneGeometry(width - 0.12, len), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
+      const rubN = pbr().rubberN.clone(); rubN.needsUpdate = true; rubN.repeat.set(1, len / 1.6);
+      const surf = new THREE.Mesh(new THREE.PlaneGeometry(width - 0.12, len), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75, normalMap: rubN, normalScale: new THREE.Vector2(0.8, 0.8) }));
       surf.rotation.x = -Math.PI / 2;
       surf.position.y = b.top + 0.005;
       surf.receiveShadow = true;
@@ -247,7 +295,7 @@ export class LevelView {
       g.add(tag);
       this.add(g);
       // forward direction in world: horiz group rotated -90°: local -z → +x? we orient texture by scroll sign
-      this.belts[b.id] = { tex, len, surf, lamp, g, dirSign: horiz ? 1 : 1 };
+      this.belts[b.id] = { tex, rubN, len, surf, lamp, g };
     }
     // ── sorter ──
     {
@@ -514,7 +562,7 @@ export class LevelView {
     {
       const g = new THREE.Group();
       g.position.set(BOILER.x, 0, BOILER.z);
-      const tank = M(cyl(1.35, 1.35, 3.0, 26), mat('#c0583a', { rough: 0.4, metal: 0.3 }), 0, 1.6, 0);
+      const tank = M(cyl(1.35, 1.35, 3.0, 26), pmat('#c0583a', 'metal', 3, 1.5, { rough: 0.8, metal: 0.45 }), 0, 1.6, 0);
       outline(tank, 0.04);
       g.add(tank);
       g.add(M(new THREE.SphereGeometry(1.35, 26, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat('#c0583a', { rough: 0.4, metal: 0.3 }), 0, 3.1, 0));
@@ -773,7 +821,7 @@ export class LevelView {
     this.add(M(rb(0.3, 0.4, 0.3, 0.1), mat('#ffffff'), -9.2, 1.1, -14.1));
     // wall lamps (emissive cages) on north walls
     for (const x of [-42, -36, -27, -19, -9, 0, 14, 21, 27]) {
-      const l = M(new THREE.SphereGeometry(0.18, 12, 10), uniqueMat('#fff6d6', { emissive: '#ffe7a8', ei: 1 }), x, 3.2, -9.55);
+      const l = M(new THREE.SphereGeometry(0.18, 12, 10), uniqueMat('#fff6d6', { emissive: '#ffe7a8', ei: 3 }), x, 3.2, -9.55);
       this.add(l);
       this.lamps.push(l);
       this.add(M(new THREE.CylinderGeometry(0.28, 0.18, 0.2, 12, 1, true), mat(PAL.ink, { side: THREE.DoubleSide }), x, 3.35, -9.55));
@@ -805,8 +853,9 @@ export class LevelView {
       const v = this.belts[b.id];
       const [dir, jam, speed] = plant.b[b.id];
       v.tex.offset.y -= (speed * dt) / 1.6;
+      v.rubN.offset.y = v.tex.offset.y;
       const col = jam ? (Math.sin(t * 12) > 0 ? '#ff3b30' : '#401010') : Math.abs(speed) > 0.1 ? (dir > 0 ? '#49c46b' : '#ffb547') : '#333';
-      if (v.lampCol !== col) { v.lamp.material.color.set(col); v.lamp.material.emissive.set(col === '#333' ? '#000' : col); v.lampCol = col; }
+      if (v.lampCol !== col) { v.lamp.material.color.set(col); v.lamp.material.emissive.set(col === '#333' ? '#000' : col); v.lamp.material.emissiveIntensity = 2.5; v.lampCol = col; }
       v.g.position.y = jam ? Math.sin(t * 40) * 0.02 : 0;
     }
     this.setLever('belt_a', plant.b.A[0] > 0, dt);
@@ -927,10 +976,10 @@ export class LevelView {
     const alarm = !plant.main || plant.P > 88 || plant.inc.some((i) => i.k === 'breach');
     for (const b of this.beacons) {
       b.b.rotation.y = alarm ? t * 6 : 0;
-      b.dome.material.emissiveIntensity = alarm ? 1.5 : 0;
+      b.dome.material.emissiveIntensity = alarm ? 4 : 0;
       b.light.intensity = alarm ? 40 : 0;
     }
-    for (const l of this.lamps) l.material.emissiveIntensity = plant.main ? (game?.dark ? 0.15 : 1) : 0.05;
+    for (const l of this.lamps) l.material.emissiveIntensity = plant.main ? (game?.dark ? 0.4 : 3) : 0.05;
   }
 
   flashPad(id) { if (this.pads[id]) this.pads[id].flash = 1; }
