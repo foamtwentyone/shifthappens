@@ -9,6 +9,7 @@ import {
 import { BAYS, RIDERS } from '../../shared/constants.js';
 import { PAL, mat, pmat, pbr, uniqueMat, floorTex, hazardTex, beltTex, labelTex, stencilTex, gaugeTex, screenTex } from './tex.js';
 import { M, outline } from './models.js';
+import { dressPlant, animateDressing } from './dressing.js';
 
 const rb = (w, h, d, r = 0.06) => new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001));
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
@@ -43,6 +44,7 @@ export class LevelView {
     this.buildMachines();
     this.buildLobby();
     this.buildDecor();
+    dressPlant(this);
   }
 
   add(o) { this.root.add(o); return o; }
@@ -327,8 +329,9 @@ export class LevelView {
     {
       const g = new THREE.Group();
       g.position.set(SCANNER.x, 0, SCANNER.z);
-      for (const s of [-1, 1]) g.add(M(rb(0.3, 2.4, 0.3, 0.08), mat(PAL.steel2), 0, 1.2, s * 1.15));
-      g.add(M(rb(0.5, 0.35, 2.8, 0.1), mat(PAL.blue), 0, 2.45, 0));
+      this.scannerShell = [];
+      for (const s of [-1, 1]) { const leg = M(rb(0.3, 2.4, 0.3, 0.08), mat(PAL.steel2), 0, 1.2, s * 1.15); g.add(leg); this.scannerShell.push(leg); }
+      const bar = M(rb(0.5, 0.35, 2.8, 0.1), mat(PAL.blue), 0, 2.45, 0); g.add(bar); this.scannerShell.push(bar);
       const beam = M(new THREE.PlaneGeometry(2.0, 1.6), uniqueMat('#ff4040', { emissive: '#ff2020', ei: 1, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false }), 0, 1.5, 0, { ry: Math.PI / 2, shadow: false });
       g.add(beam);
       const s = sign('SCAN', 1.2, 0.3, { bg: PAL.ink, fg: '#7ee0ff', size: 110 });
@@ -389,9 +392,12 @@ export class LevelView {
       // hopper
       const h = new THREE.Group();
       h.position.set(TUBE.mouth[0], 0, TUBE.mouth[2]);
-      h.add(M(new THREE.CylinderGeometry(0.95, 0.6, 0.9, 20, 1, true), mat(PAL.teal, { side: THREE.DoubleSide }), 0, 0.95, 0));
-      h.add(M(new THREE.TorusGeometry(0.95, 0.07, 8, 24), mat(PAL.yellow), 0, 1.4, 0, { rx: Math.PI / 2 }));
-      h.add(M(rb(1.5, 0.6, 1.5, 0.08), mat('#3d4a50'), 0, 0.3, 0));
+      this.hopperShell = [
+        M(new THREE.CylinderGeometry(0.95, 0.6, 0.9, 20, 1, true), mat(PAL.teal, { side: THREE.DoubleSide }), 0, 0.95, 0),
+        M(new THREE.TorusGeometry(0.95, 0.07, 8, 24), mat(PAL.yellow), 0, 1.4, 0, { rx: Math.PI / 2 }),
+        M(rb(1.5, 0.6, 1.5, 0.08), mat('#3d4a50'), 0, 0.3, 0),
+      ];
+      h.add(...this.hopperShell);
       const swirl = M(new THREE.CircleGeometry(0.62, 24), uniqueMat('#0d1a1e', { emissive: '#2aa7a2', ei: 0.3 }), 0, 0.62, 0, { rx: -Math.PI / 2, shadow: false });
       h.add(swirl);
       const s = sign('PNEUMA-TUBE', 1.8, 0.42, { bg: PAL.teal, fg: '#fff', size: 100 });
@@ -846,6 +852,7 @@ export class LevelView {
   // ───────────────────────────── per-frame sync ─────────────────────────────
   update(plant, game, dt, t, localPlayers) {
     this.t = t;
+    animateDressing(this, t, dt);
     if (!plant) return;
     const powered = (zi) => plant.main && plant.pw[zi] && plant.es[zi] <= 0;
     // belts

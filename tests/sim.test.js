@@ -227,9 +227,10 @@ test('magnet hoists cores up and drops them on the sky dock', () => {
 
 test('online friends with the same saved outfit get distinct colours', () => {
   const { room } = makeRoom();
-  const o = { color: '#ff7a2f', hat: 'hardhat', face: 'happy' };
+  const o = { color: '#ff7a2f', hat: 'none', model: 'worker' };
   room.join('a', { outfit: { ...o } });
   room.join('b', { outfit: { ...o } });
   const [p1, p2] = [...room.sim.players.values()];
   assert.notEqual(p1.outfit.color, p2.outfit.color);
+  assert.notEqual(p1.outfit.model, p2.outfit.model);
 });

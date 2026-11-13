@@ -101,8 +101,10 @@ export const ORDERABLE = ['crate', 'wobble', 'gnome', 'beans', 'balloon', 'magne
 
 // Character customisation
 export const OUTFIT_COLORS = ['#ff7a2f', '#1fb5a8', '#8b5cf6', '#7ac943', '#ff5d8f', '#ffc93c', '#3b82d6', '#e8423f'];
-export const HATS = ['hardhat', 'beanie', 'cap', 'cone', 'paper', 'welder', 'none'];
-export const FACES = ['happy', 'stache', 'sleepy', 'grumpy'];
+export const HATS = ['none', 'hardhat', 'cap', 'cone'];
+// Kenney Mini Characters (CC0) — the "model" part of an outfit
+export const MODELS = ['worker', 'male-a', 'female-a', 'male-b', 'female-b', 'male-c', 'female-c', 'male-d', 'female-d', 'male-e',
+  'female-e', 'male-f', 'female-f', 'male-g', 'robot', 'alien', 'soldier', 'knight', 'raider', 'zombie'];
 
 // Risk riders — signed at the board in the break room.
 export const RIDERS = {

@@ -86,7 +86,7 @@ export class Room {
         if (p && msg.o) {
           if (typeof msg.o.color === 'string') p.outfit.color = msg.o.color.slice(0, 9);
           if (typeof msg.o.hat === 'string') p.outfit.hat = msg.o.hat.slice(0, 12);
-          if (typeof msg.o.face === 'string') p.outfit.face = msg.o.face.slice(0, 12);
+          if (typeof msg.o.model === 'string') p.outfit.model = msg.o.model.slice(0, 12);
         }
         break;
       }

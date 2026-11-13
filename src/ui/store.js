@@ -1,7 +1,7 @@
 // Persistent settings + employee records (localStorage, best-effort).
 const DEFAULTS = {
   master: 0.8, music: 0.55, sfx: 0.9, quality: 'medium', shake: true, prompts: true,
-  name: '', outfit: { color: '#ff7a2f', hat: 'hardhat', face: 'happy' }, server: '',
+  name: '', outfit: { color: '#ff7a2f', hat: 'none', model: 'worker' }, server: '',
 };
 
 function load(key, fallback) {

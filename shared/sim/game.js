@@ -1,7 +1,7 @@
 // Shift flow, contracts, money and the end-of-shift report.
 // Lobby → (everyone punches in) → countdown → shift → [quota met → hotline: clock out | overtime]
 //       → ending → report → lobby
-import { CARGO, RIDERS, PENALTY, ORDERABLE, OUTFIT_COLORS, HATS, FACES } from '../constants.js';
+import { CARGO, RIDERS, PENALTY, ORDERABLE, OUTFIT_COLORS, HATS, MODELS } from '../constants.js';
 import { SPOTS, SPAWNS, LOBBY_BALL, PADS } from '../level.js';
 import { shuffle, pick, r2 } from './util.js';
 
@@ -142,7 +142,7 @@ export class Game {
     sim.addControl({ id: 'locker_hat', pos: SPOTS.locker_hat, kind: 'press', snd: 'locker',
       label: () => 'SWAP HAT', act: (s, p) => { p.outfit.hat = cycle(HATS, p.outfit.hat); } });
     sim.addControl({ id: 'locker_face', pos: SPOTS.locker_face, kind: 'press', snd: 'locker',
-      label: () => 'MIRROR: NEW FACE', act: (s, p) => { p.outfit.face = cycle(FACES, p.outfit.face); } });
+      label: () => 'MIRROR: NEW LOOK', act: (s, p) => { p.outfit.model = cycle(MODELS, p.outfit.model); } });
     sim.addControl({ id: 'punch', pos: SPOTS.punch, kind: 'press', snd: 'punch',
       label: (s, p) => (lobby() ? (p.ready ? 'PUNCH OUT (NOT READY)' : 'PUNCH IN (READY)') : null),
       act: (s, p) => { p.ready = !p.ready; sim.emit('punch', { id: p.id, on: p.ready }); if (!p.ready) game.cancelCountdown(); } });

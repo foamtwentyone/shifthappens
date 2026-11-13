@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { PAL, mat, pmat, pbr, uniqueMat, inkMat, faceTex, labelTex } from './tex.js';
 import { BAYS } from '../../shared/constants.js';
+import { assets } from './assets.js';
 
 const geoCache = new Map();
 function geo(key, make) {
@@ -92,7 +93,7 @@ function buildHat(kind, color) {
 }
 
 // ─────────────────────────────── worker ───────────────────────────────
-export function buildWorker(outfit, seed = 0) {
+function buildProcWorker(outfit, seed = 0) {
   const color = outfit?.color ?? PAL.orange;
   const root = new THREE.Group();
   const overall = uniqueMat(color, { rough: 0.8 });
@@ -185,7 +186,7 @@ export function buildWorker(outfit, seed = 0) {
 }
 
 // st: { speed, grounded, vy, state, carrying, carryingPlayer, using, anim, belt }
-export function animateWorker(model, st, dt, t) {
+function animateProcWorker(model, st, dt, t) {
   const u = model.userData;
   const { body, head, armL, armR, legL, legR } = u;
   const down = st.state === 1, carried = st.state === 2;
@@ -417,4 +418,105 @@ export function buildCargo(type) {
   g.userData.badgeY = badgeY;
   g.userData.type = type;
   return g;
+}
+
+
+// ─────────────────────────────── Kenney skinned workers ───────────────────────────────
+const CHAR_SCALE = 1.9;
+const ARM = /^arm-/;
+const clipCache = new Map();
+function variant(clip, kind) {
+  const key = clip.uuid + kind;
+  if (!clipCache.has(key)) {
+    const tracks = clip.tracks.filter((t) => (kind === 'arms' ? ARM.test(t.name) : !ARM.test(t.name)));
+    clipCache.set(key, new THREE.AnimationClip(`${clip.name}-${kind}`, clip.duration, tracks));
+  }
+  return clipCache.get(key);
+}
+
+function hatFor(kind) {
+  if (kind === 'hardhat') return assets.prop('prototype/hat-hard', 0.95);
+  if (kind === 'cap') return assets.prop('prototype/hat-cap', 0.95);
+  if (kind === 'cone') {
+    const g = new THREE.Group();
+    const c = M(cone(0.13, 0.32, 16), mat(PAL.orange, { rough: 0.4 }), 0, 0.16, 0);
+    g.add(c, M(cyl(0.085, 0.105, 0.05), mat('#ffffff'), 0, 0.15, 0), M(rbox(0.3, 0.03, 0.3, 0.01), mat(PAL.orange), 0, 0.01, 0));
+    return g;
+  }
+  return null;
+}
+
+export function buildWorker(outfit, seed = 0) {
+  const ch = assets.ready ? assets.character(outfit?.model ?? 'worker') : null;
+  if (!ch) return buildProcWorker(outfit, seed);
+  const root = new THREE.Group();
+  const inner = new THREE.Group();
+  root.add(inner);
+  ch.scene.scale.setScalar(CHAR_SCALE);
+  inner.add(ch.scene);
+  const head = ch.scene.getObjectByName('head');
+  const hat = hatFor(outfit?.hat);
+  if (head && hat) { hat.position.set(0, 0.13, 0.0); head.add(hat); }
+  // team colour ring on the floor: instantly tells couch players apart
+  const ring = new THREE.Mesh(geo('ring', () => new THREE.RingGeometry(0.42, 0.52, 32)), new THREE.MeshBasicMaterial({ color: outfit?.color ?? PAL.orange, transparent: true, opacity: 0.85, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.025;
+  ring.renderOrder = 2;
+  const blob = new THREE.Mesh(geo('blob', () => new THREE.CircleGeometry(0.45, 20)), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.22, depthWrite: false }));
+  blob.rotation.x = -Math.PI / 2;
+  blob.position.y = 0.02;
+  blob.renderOrder = 1;
+  blob.add(ring);
+  ring.rotation.x = 0; ring.position.set(0, 0, 0.003);
+  const mixer = new THREE.AnimationMixer(ch.scene);
+  const clips = Object.fromEntries(ch.clips.map((c) => [c.name, c]));
+  const act = (name, kind = 'full') => {
+    const c = clips[name];
+    if (!c) return null;
+    return mixer.clipAction(kind === 'full' ? c : variant(c, kind));
+  };
+  const A = {
+    idle: act('idle'), walk: act('walk'), sprint: act('sprint'), jump: act('jump'), fall: act('fall'), die: act('die'),
+    idleL: act('idle', 'legs'), walkL: act('walk', 'legs'), sprintL: act('sprint', 'legs'),
+    hold: act('holding-both', 'arms'), use: act('interact-right', 'arms'), cheer: act('emote-yes'),
+  };
+  for (const k of ['jump', 'die']) if (A[k]) { A[k].setLoop(THREE.LoopOnce); A[k].clampWhenFinished = true; }
+  root.userData = { kenney: true, inner, mixer, A, base: null, arms: null, blob, ring, squash: 1, squashV: 0, wasGrounded: true, hat };
+  return root;
+}
+
+function crossfade(u, slot, action, fade = 0.15) {
+  if (u[slot] === action) return;
+  if (u[slot]) u[slot].fadeOut(fade);
+  if (action) action.reset().setEffectiveWeight(1).fadeIn(fade).play();
+  u[slot] = action;
+}
+
+export function animateWorker(model, st, dt, t) {
+  const u = model.userData;
+  if (!u.kenney) return animateProcWorker(model, st, dt, t);
+  const A = u.A;
+  const down = st.state === 1, carried = st.state === 2 || st.state === 3;
+  const sp = st.speed || 0;
+  const busyArms = (st.carrying || st.carryingPlayer) ? A.hold : (st.using || st.anim > 0) ? A.use : null;
+  let base;
+  if (down) base = A.die;
+  else if (carried) base = A.fall;
+  else if (!st.grounded) base = st.vy > 0.5 ? A.jump : A.fall;
+  else if (sp > 0.4) base = sp > 5.3 ? (busyArms ? A.sprintL : A.sprint) : (busyArms ? A.walkL : A.walk);
+  else base = busyArms ? A.idleL : A.idle;
+  crossfade(u, 'base', base, down ? 0.08 : 0.15);
+  crossfade(u, 'arms', down || carried ? null : busyArms, 0.12);
+  if (base === A.walk || base === A.walkL) base.timeScale = Math.max(0.6, sp / 3.0);
+  if (base === A.sprint || base === A.sprintL) base.timeScale = Math.max(0.8, sp / 5.5);
+  // cartoon squash on landing
+  if (st.grounded && !u.wasGrounded && (st.prevVy ?? 0) < -4) u.squashV -= Math.min(5, -(st.prevVy ?? 0) * 0.6);
+  u.wasGrounded = st.grounded;
+  u.squashV += (1 - u.squash) * 170 * dt;
+  u.squashV *= Math.exp(-11 * dt);
+  u.squash += u.squashV * dt;
+  const sq = Math.max(0.6, u.squash);
+  u.inner.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
+  u.inner.rotation.z = carried ? Math.sin(t * 9) * 0.25 : 0;
+  u.mixer.update(dt);
 }

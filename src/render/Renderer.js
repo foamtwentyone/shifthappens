@@ -186,8 +186,8 @@ export class Renderer {
       [[-10, -14], [-2, -14], [-2, -12], [-10, -12]],
     ];
     const outfits = [
-      { color: '#ff7a2f', hat: 'hardhat', face: 'happy' }, { color: '#1fb5a8', hat: 'cone', face: 'stache' },
-      { color: '#8b5cf6', hat: 'beanie', face: 'sleepy' }, { color: '#7ac943', hat: 'cap', face: 'grumpy' },
+      { color: '#ff7a2f', hat: 'none', model: 'worker' }, { color: '#1fb5a8', hat: 'cone', model: 'female-b' },
+      { color: '#8b5cf6', hat: 'cap', model: 'male-c' }, { color: '#7ac943', hat: 'hardhat', model: 'female-d' },
     ];
     paths.forEach((p, i) => {
       const w = buildWorker(outfits[i], i);
@@ -259,12 +259,13 @@ export class Renderer {
       this.prScene.add(new THREE.HemisphereLight('#ffffff', '#887766', 2.0));
       const dl = new THREE.DirectionalLight('#fff3e0', 1.8); dl.position.set(2, 3, 4); this.prScene.add(dl);
       this.prCam = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
-      this.prCam.position.set(0.9, 1.5, 3.0);
-      this.prCam.lookAt(0, 1.0, 0);
+      this.prCam.position.set(0.8, 1.15, 3.1);
+      this.prCam.lookAt(0, 0.78, 0);
     }
     const w = buildWorker(outfit, seed);
     w.rotation.y = 0.35;
     animateWorker(w, { speed: 0, grounded: true, vy: 0, state: 0 }, 0.016, 1.3);
+    animateWorker(w, { speed: 0, grounded: true, vy: 0, state: 0 }, 0.5, 1.8);
     this.prScene.add(w);
     this.pr.setClearColor(0x000000, 0);
     this.pr.render(this.prScene, this.prCam);
@@ -276,6 +277,7 @@ export class Renderer {
 
   // ───────────────────────────── per frame ─────────────────────────────
   setMode(m) {
+    if (m === 'menu' && this.mode !== 'menu') this.snapCam = true;
     this.mode = m;
     this.desk.visible = m === 'menu';
     this.setDemoVisible(m === 'menu');
@@ -295,6 +297,7 @@ export class Renderer {
       this.level.update(this.demoPlant, { ph: 'menu', riders: {}, contracts: null, ledger: 0, shifts: 0, tier: 0 }, dt, t);
       const sway = Math.sin(t * 0.15) * 1.2;
       this.camGoal = { pos: new THREE.Vector3(-6 + sway, 19.5, 31), target: new THREE.Vector3(-4 + sway * 0.6, 0, -4) };
+      if (this.snapCam !== false) { this.camPos.copy(this.camGoal.pos); this.camTarget.copy(this.camGoal.target); this.snapCam = false; }
       if (Math.random() < dt * 2) { const wp = this.mug.getWorldPosition(new THREE.Vector3()); this.fx.steam(wp.x, wp.y + 0.6, wp.z, 1, 0.6); }
       this.ambientFx(this.demoPlant, null, dt);
     } else if (state) {
@@ -389,6 +392,7 @@ export class Renderer {
     if (plant.so[1] && tick('sorter', 4)) this.fx.sparks(SORTER.x, 1.8, SORTER.z + 1.2, 4, '#7ee0ff');
     if (plant.hp === 1 && tick('heat', 6)) this.fx.spawnSprite(new THREE.Vector3(HEATPAD.x + (Math.random() - 0.5), 0.4, HEATPAD.z + (Math.random() - 0.5)), { color: '#ffb56b', size: 0.2, life: 0.7, vel: new THREE.Vector3(0, 1.5, 0), grow: 2, opacity: 0.4, add: true });
     if (tick('incin', 5)) this.fx.flames(INCINERATOR.x, 0.8, INCINERATOR.z, 1);
+    for (const [i, c] of (this.level.chimneys || []).entries()) if (tick('chim' + i, 2.5)) this.fx.spawnSprite(new THREE.Vector3(c[0], c[1], c[2]), { color: '#d9e2e4', size: 1.6, life: 4, vel: new THREE.Vector3(1.2, 2.2, 0.4), grow: 3.5, opacity: 0.45, drag: 0.3 });
     if (plant.dr && plant.dr[1] > 0.4 && plant.dr[2] > 0.4 && tick('wind', 25)) {
       const x = -6 + Math.random() * 20;
       this.fx.spawnSprite(new THREE.Vector3(x, 0.4 + Math.random() * 2, (Math.random() - 0.5) * 6), { color: '#ffffff', size: 0.18, life: 0.6, vel: new THREE.Vector3(14, 0, 0), grow: 0.5, opacity: 0.6, drag: 0 });

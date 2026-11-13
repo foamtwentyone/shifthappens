@@ -3,7 +3,7 @@
 import * as CANNON from 'cannon-es';
 import {
   GRAVITY, PLAYER, CARGO, G_STATIC, G_PLAYER, G_CARGO, G_DOOR, G_HELD,
-  OUTFIT_COLORS, HATS, FACES,
+  OUTFIT_COLORS, HATS, MODELS,
 } from '../constants.js';
 import { WALLS, SKY_DOCK, SPAWNS, LOBBY_BALL, zoneAt } from '../level.js';
 import { mulberry32, clamp, r3, r2 } from './util.js';
@@ -125,15 +125,15 @@ export class Sim {
     const used = new Set([...this.players.values()].map((q) => q.outfit.color));
     if (outfit && used.has(outfit.color)) {
       outfit = { ...outfit, color: OUTFIT_COLORS.find((c) => !used.has(c)) ?? outfit.color };
-      const hats = new Set([...this.players.values()].map((q) => q.outfit.hat));
-      if (hats.has(outfit.hat)) outfit.hat = HATS.find((h) => !hats.has(h)) ?? outfit.hat;
+      const models = new Set([...this.players.values()].map((q) => q.outfit.model));
+      if (models.has(outfit.model)) outfit.model = MODELS.find((m) => !models.has(m)) ?? outfit.model;
     }
     const p = {
       id, name: (name || `Worker ${n + 1}`).slice(0, 14), body, slot: slot ?? n,
       outfit: {
         color: outfit?.color ?? OUTFIT_COLORS.find((c) => !used.has(c)) ?? OUTFIT_COLORS[n % OUTFIT_COLORS.length],
-        hat: outfit?.hat ?? HATS[n % HATS.length],
-        face: outfit?.face ?? FACES[n % FACES.length],
+        hat: HATS.includes(outfit?.hat) ? outfit.hat : 'none',
+        model: MODELS.includes(outfit?.model) ? outfit.model : MODELS[(n * 3) % MODELS.length],
       },
       yaw: 0, state: STATE.ok, downT: 0, holding: null, carriedBy: null, escape: 0,
       input: { mx: 0, mz: 0, b: 0, c: [0, 0, 0, 0] }, lastC: [0, 0, 0, 0], held: 0,

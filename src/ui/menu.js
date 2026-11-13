@@ -1,6 +1,6 @@
 // Title card, main menu ("the shift manager's desk") and its sheets.
 import { h, plate, money, keycap } from './dom.js';
-import { OUTFIT_COLORS, HATS, FACES } from '../../shared/constants.js';
+import { OUTFIT_COLORS, HATS, MODELS } from '../../shared/constants.js';
 import { SCHEMES, PAD_KEYS } from '../input/Input.js';
 
 const warnSvg = `<svg class="warn" viewBox="0 0 64 56"><path d="M32 4 L60 52 L4 52 Z" fill="#ffc93c" stroke="#1b1f24" stroke-width="5" stroke-linejoin="round"/><rect x="29" y="20" width="6" height="16" rx="2" fill="#1b1f24"/><circle cx="32" cy="43" r="3.5" fill="#1b1f24"/></svg>`;
@@ -83,9 +83,12 @@ export function openSheet(app, content) {
   closeSheet();
   const back = h('div', { class: 'modal-back fade-in', onclick: (e) => { if (e.target === back) { app.audio.play('ui'); closeSheet(); } } }, content);
   document.getElementById('ui').append(back);
-  const off = app.input.onPress((code) => { if (code === 'Escape') { closeSheet(); } });
-  back.cleanup = off;
-  const first = back.querySelector('input');
+  // Escape must work even while typing in a field
+  const onEsc = (e) => { if (e.key === 'Escape') { e.preventDefault(); closeSheet(); } };
+  addEventListener('keydown', onEsc, true);
+  back.cleanup = () => removeEventListener('keydown', onEsc, true);
+  // only code-entry sheets grab the keyboard; others keep game keys working
+  const first = back.querySelector('input.code');
   if (first) setTimeout(() => first.focus(), 50);
   return back;
 }
@@ -216,12 +219,13 @@ export function lockerSheet(app, pid) {
   };
   const swatches = h('div', { class: 'swatches' });
   const hats = h('div', { class: 'opt-row' });
-  const faces = h('div', { class: 'opt-row' });
+  const faces = h('div', { class: 'model-grid' });
   const draw = () => {
     swatches.innerHTML = ''; hats.innerHTML = ''; faces.innerHTML = '';
     for (const c of OUTFIT_COLORS) swatches.append(h('button', { class: `swatch${outfit.color === c ? ' on' : ''}`, style: { background: c }, onclick: () => { outfit.color = c; app.audio.play('locker'); draw(); refresh(); } }));
-    for (const ht of HATS) hats.append(h('button', { class: `opt${outfit.hat === ht ? ' on' : ''}`, onclick: () => { outfit.hat = ht; app.audio.play('locker'); draw(); refresh(); } }, ht === 'none' ? 'BARE' : ht));
-    for (const f of FACES) faces.append(h('button', { class: `opt${outfit.face === f ? ' on' : ''}`, onclick: () => { outfit.face = f; app.audio.play('locker'); draw(); refresh(); } }, f));
+    for (const ht of HATS) hats.append(h('button', { class: `opt${outfit.hat === ht ? ' on' : ''}`, onclick: () => { outfit.hat = ht; app.audio.play('locker'); draw(); refresh(); } }, ht === 'none' ? 'OWN LOOK' : ht));
+    for (const m of MODELS) faces.append(h('button', { class: `model-pick${outfit.model === m ? ' on' : ''}`, title: m, onclick: () => { outfit.model = m; app.audio.play('locker'); draw(); refresh(); } },
+      h('img', { src: app.renderer.portrait({ model: m, hat: 'none', color: outfit.color }, 0), alt: m })));
   };
   draw();
   refresh();
@@ -233,9 +237,9 @@ export function lockerSheet(app, pid) {
       mirror,
       h('div', {},
         h('div', { class: 'field' }, h('label', {}, 'Badge name'), name),
-        h('h4', { style: { marginTop: '14px' } }, 'Overalls'), swatches,
+        h('h4', { style: { marginTop: '14px' } }, 'Worker'), faces,
+        h('h4', { style: { marginTop: '14px' } }, 'Team colour'), swatches,
         h('h4', { style: { marginTop: '14px' } }, 'Headwear'), hats,
-        h('h4', { style: { marginTop: '14px' } }, 'Face'), faces,
         h('p', { style: { fontSize: '12px', opacity: 0.75 } }, 'Tip: the lockers in the break room work too — walk up and press USE.'))),
     h('div', { class: 'row', style: { justifyContent: 'flex-end', marginTop: '12px' } }, h('button', { class: 'btn', onclick: () => closeSheet() }, 'LOOKING GOOD'))));
 }

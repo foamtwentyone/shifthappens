@@ -7,6 +7,7 @@ import '@fontsource/space-mono/700.css';
 import './ui/styles.css';
 
 import { Renderer } from './render/Renderer.js';
+import { assets } from './render/assets.js';
 import { Audio } from './audio/Audio.js';
 import { Input, SCHEMES } from './input/Input.js';
 import { Session, LocalTransport, WebSocketTransport } from './net/Session.js';
@@ -158,7 +159,7 @@ class App {
     const n = this.session.local.length + 1;
     const cols = ['#1fb5a8', '#8b5cf6', '#7ac943', '#ff5d8f'];
     const hats = ['cone', 'beanie', 'cap', 'welder'];
-    this.session.addLocal(device, `Player ${n}`, { color: cols[n % 4], hat: hats[n % 4], face: ['stache', 'sleepy', 'grumpy', 'happy'][n % 4] });
+    this.session.addLocal(device, `Player ${n}`, { color: cols[n % 4], hat: 'none', model: ['female-b', 'male-c', 'robot', 'female-e'][n % 4] });
     this.audio.play('punch');
     toast(`Player ${n} clocked in on ${device.startsWith('pad') ? 'a gamepad' : 'the arrow keys'}!`);
   }
@@ -301,6 +302,15 @@ class App {
 }
 
 async function boot() {
+  // loading card (plain DOM; the design-system CSS is already in)
+  const ui = document.getElementById('ui');
+  const bar = h('i', { style: { display: 'block', height: '100%', width: '0%', background: 'var(--yellow)', transition: 'width .2s' } });
+  const card = h('div', { class: 'screen title-card' }, h('div', { style: { textAlign: 'center', color: '#f4ebd9' } },
+    h('div', { class: 'eyebrow', style: { marginBottom: '12px' } }, 'PLANT 7 · WARMING UP THE BOILER'),
+    h('div', { style: { width: '320px', height: '16px', border: '3px solid #1b1f24', borderRadius: '8px', overflow: 'hidden', background: '#10201b' } }, bar)));
+  ui.append(card);
+  await assets.load((f) => { bar.style.width = `${Math.round(f * 100)}%`; });
+  card.remove();
   try {
     await Promise.race([
       Promise.all([document.fonts.load('64px Bungee'), document.fonts.load('20px "Space Mono"'), document.fonts.load('16px Rubik')]),
