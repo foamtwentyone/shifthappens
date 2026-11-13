@@ -3,6 +3,7 @@ import { h, plate, money, clock, keycap } from './dom.js';
 import { CARGO, BAYS, RIDERS, MAX_PLAYERS } from '../../shared/constants.js';
 import { ZONES, CONVEYORS, PADS, SKY_DOCK, BOUNDS } from '../../shared/level.js';
 import { lockerSheet, openSheet } from './menu.js';
+import { BulbBoard } from './bulbboard.js';
 
 // cargo icons are rendered from the real 3D models (emoji differ per OS, and some are missing)
 let iconApp = null;
@@ -35,23 +36,6 @@ const TIPS = [
   'Big red E-STOP clears a zone\'s breakdowns instantly — for $25 and four seconds of silence.',
   'Junk ducks clog belts. Feed them to the incinerator for a little recycling money.',
 ];
-
-// stadium-style 7-segment board: unlit "8" segments behind the lit digits
-function scoreboard(label, color, ghost) {
-  const lit = h('span', { class: 'lit' });
-  const gh = h('span', { class: 'ghost' }, ghost);
-  const el = h('div', { class: `board ${color}` }, h('div', { class: 'board-label' }, label), h('div', { class: 'board-face' }, gh, lit));
-  el._lit = lit; el._ghost = gh;
-  return el;
-}
-function setBoard(el, text, width) {
-  // DSEG uses "!" as a blank of digit width; ":" and "." are narrow and shared with the ghost
-  const t = text.length >= width ? text : '!'.repeat(width - text.length) + text;
-  if (el._lit.textContent !== t) {
-    el._lit.textContent = t;
-    el._ghost.textContent = t.replace(/[0-9!-]/g, '8');
-  }
-}
 
 const SVG_RING = (p) => {
   const r = 12, c = 2 * Math.PI * r;
@@ -180,9 +164,12 @@ export class Hud {
     this.root.innerHTML = '';
     this.sh = {};
     this.sh.manifest = h('div', { class: 'paper' });
-    this.sh.time = scoreboard('TIME LEFT', 'amber', '88:88');
+    this.timeBoard = new BulbBoard({ label: 'TIME LEFT', color: 'amber', cells: 4, pitch: 6.5, colon: true });
+    this.sh.time = this.timeBoard.el;
     this.sh.phase = h('div', { class: 'phase' }, 'SHIFT');
-    this.sh.money = scoreboard('EARNINGS  $', 'green', '888888');
+    this.moneyBoard = new BulbBoard({ label: 'EARNINGS', color: 'green', cells: 6, pitch: 6.5 });
+    this.sh.money = this.moneyBoard.el;
+    this.shownMoney = 0;
     this.sh.mult = h('span', { class: 'dymo red' }, '×1.00');
     this.sh.alerts = h('div', { class: 'alerts' });
     this.sh.hotline = h('div', {});
@@ -223,18 +210,20 @@ export class Hud {
     }
     // clock
     const tl = g.tl;
-    setBoard(sh.time, clock(tl), 5);
-    sh.time.classList.toggle('red', tl < 30);
-    sh.time.classList.toggle('blink', tl < 10 && g.ph === 'shift');
+    const blinkOff = tl < 10 && g.ph === 'shift' && Math.floor(performance.now() / 280) % 2 === 1;
+    this.timeBoard.set(clock(tl), tl < 30 ? 'red' : 'amber', blinkOff);
     if (tl < 10 && Math.ceil(tl) !== sh.keys.beep) { sh.keys.beep = Math.ceil(tl); this.app.audio.play('beep'); }
     sh.phase.textContent = g.ph === 'ending' ? 'SHIFT OVER' : g.ot ? (g.otDone ? `OVERTIME #${g.ot} DONE` : `OVERTIME #${g.ot}`) : g.qm ? 'QUOTA MET — BONUS TIME' : '';
     // money
+    // the earnings board rolls toward the new total like a tally counter
     if (g.money !== this.lastMoney) {
-      setBoard(sh.money, String(Math.round(g.money)), 6);
-      sh.money.classList.toggle('red', g.money < 0);
       sh.money.classList.remove('bump'); void sh.money.offsetWidth; sh.money.classList.add('bump');
       this.lastMoney = g.money;
     }
+    const diff = g.money - this.shownMoney;
+    if (diff) this.shownMoney += Math.abs(diff) < 2 ? diff : Math.sign(diff) * Math.max(1, Math.ceil(Math.abs(diff) * Math.min(1, dt * 9)));
+    const m = Math.round(this.shownMoney);
+    this.moneyBoard.set(m < 0 ? `-$${-m}` : `$${m}`, m < 0 ? 'red' : 'green');
     sh.mult.textContent = `PAY ×${g.mult.toFixed(2)}`;
     // alerts: active incidents + pressure + transients
     const items = [];
