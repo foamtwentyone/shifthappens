@@ -39,6 +39,7 @@ namespace ShiftHappens
         public Records records;
         public Session session;
         Room room;               // only when this machine is the host (local or online)
+        public Sim HostSim => room?.sim;
         string mode = "title";   // title | menu | game
         bool paused;
         public string ShareCode = "";
@@ -68,6 +69,7 @@ namespace ShiftHappens
             NetBridge.OnClientMessage += data => session?.Receive(data);
             NetBridge.OnDisconnected += reason => { if (session != null && !session.isLocal && room == null) { ui.Toast(reason); LeaveToMenu(); } };
             ShowTitle();
+            if (AutoTest.Requested) AutoTest.Begin(this);
         }
 
         public void ApplyQuality() => stage.ApplyQuality(Settings.Quality);

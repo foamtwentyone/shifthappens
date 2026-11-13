@@ -42,6 +42,22 @@ namespace ShiftHappens.EditorTools
             }
         }
 
+        [MenuItem("Shift Happens/Run Self-Test")]
+        public static void RunSelfTest()
+        {
+            PlayerPrefs.SetInt("sh.autotest", 1);
+            PlayerPrefs.Save();
+            if (!EditorApplication.isPlaying) EditorApplication.EnterPlaymode();
+            Debug.Log("[ShiftHappens] Self-test started. Results will appear in the SelfTest/ folder next to Assets/ (≈1 minute).");
+        }
+
+        [MenuItem("Shift Happens/Open Self-Test Folder")]
+        public static void OpenSelfTest()
+        {
+            var dir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "SelfTest"));
+            if (Directory.Exists(dir)) EditorUtility.RevealInFinder(dir); else Debug.Log("[ShiftHappens] No SelfTest folder yet — run the self-test first.");
+        }
+
         static void EnsureQualityPipeline(RenderPipelineAsset asset)
         {
             for (int i = 0; i < QualitySettings.names.Length; i++)
