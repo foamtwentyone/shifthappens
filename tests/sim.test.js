@@ -234,3 +234,17 @@ test('online friends with the same saved outfit get distinct colours', () => {
   assert.notEqual(p1.outfit.color, p2.outfit.color);
   assert.notEqual(p1.outfit.model, p2.outfit.model);
 });
+
+test('a shift that ends in the red returns to the lobby with contracts on the board', () => {
+  const { room } = makeRoom();
+  room.join('c1', {});
+  startShift(room);
+  const g = room.sim.game;
+  g.penalty(500, 'Boiler burst', 0);
+  g.timeLeft = 1;
+  run(room, 7);
+  assert.equal(g.phase, 'lobby');
+  assert.ok(g.ledger < 0, `ledger ${g.ledger}`);
+  assert.equal(g.contracts.length, 3);
+  assert.ok(g.contracts.every((c) => c && c.bonus > 0));
+});

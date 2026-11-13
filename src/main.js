@@ -4,6 +4,8 @@ import '@fontsource/rubik/600.css';
 import '@fontsource/rubik/700.css';
 import '@fontsource/space-mono/400.css';
 import '@fontsource/space-mono/700.css';
+import '@fontsource/caveat/600.css';
+import dseg7Url from 'dseg/fonts/DSEG7-Classic/DSEG7Classic-BoldItalic.woff2?url';
 import './ui/styles.css';
 
 import { Renderer } from './render/Renderer.js';
@@ -309,6 +311,7 @@ async function boot() {
     h('div', { class: 'eyebrow', style: { marginBottom: '12px' } }, 'PLANT 7 · WARMING UP THE BOILER'),
     h('div', { style: { width: '320px', height: '16px', border: '3px solid #1b1f24', borderRadius: '8px', overflow: 'hidden', background: '#10201b' } }, bar)));
   ui.append(card);
+  try { const ff = new FontFace('DSEG7', `url(${dseg7Url})`); document.fonts.add(await ff.load()); } catch { /* falls back to Space Mono */ }
   await assets.load((f) => { bar.style.width = `${Math.round(f * 100)}%`; });
   card.remove();
   try {

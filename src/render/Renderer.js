@@ -275,6 +275,29 @@ export class Renderer {
     return url;
   }
 
+  // 3D thumbnail of a cargo model (used for HUD / report icons instead of emoji)
+  cargoIcon(type) {
+    this.iconCache ??= new Map();
+    if (this.iconCache.has(type)) return this.iconCache.get(type);
+    this.portrait({ model: 'worker', hat: 'none', color: '#ffffff' }, 0); // makes sure the mini renderer exists
+    const g = buildCargo(type);
+    g.rotation.set(0.25, -0.6, 0);
+    const box = new THREE.Box3().setFromObject(g);
+    const c = box.getCenter(new THREE.Vector3());
+    const r = box.getSize(new THREE.Vector3()).length() * 0.5;
+    g.position.sub(c);
+    const cam = new THREE.PerspectiveCamera(30, 1, 0.05, 50);
+    cam.position.set(0, r * 0.7, r * 2.55);
+    cam.lookAt(0, 0, 0);
+    this.prScene.add(g);
+    this.pr.setClearColor(0x000000, 0);
+    this.pr.render(this.prScene, cam);
+    const url = this.pr.domElement.toDataURL('image/png');
+    this.prScene.remove(g);
+    this.iconCache.set(type, url);
+    return url;
+  }
+
   // ───────────────────────────── per frame ─────────────────────────────
   setMode(m) {
     if (m === 'menu' && this.mode !== 'menu') this.snapCam = true;

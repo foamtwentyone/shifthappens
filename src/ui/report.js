@@ -1,6 +1,6 @@
 // End-of-shift factory report (Form 7B).
 import { h, money, clock } from './dom.js';
-import { ICON } from './hud.js';
+import { cargoIcon } from './hud.js';
 import { CARGO } from '../../shared/constants.js';
 
 const RESULT_STYLE = {
@@ -44,7 +44,7 @@ export function showReport(app, rep, onClose) {
               h('div', { style: { marginTop: '10px', fontSize: '13px', lineHeight: 1.6 } },
                 rep.incidentKinds.length ? rep.incidentKinds.map((k) => h('span', { class: 'dymo', style: { marginRight: '6px', display: 'inline-block', marginBottom: '4px' } }, `${k.name} ×${k.n}`)) : 'A suspiciously calm shift.'),
               h('h4', { style: { marginTop: '12px' } }, 'Order'),
-              h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } }, rep.order.map((l) => h('span', { class: 'dymo ' + (l.done >= l.need ? 'teal' : 'red') }, `${ICON[l.type] || ''} ${CARGO[l.type].short} ${l.done}/${l.need}`))))),
+              h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } }, rep.order.map((l) => h('span', { class: 'dymo ' + (l.done >= l.need ? 'teal' : 'red') }, cargoIcon(l.type, 'inline'), ` ${CARGO[l.type].short} ${l.done}/${l.need}`))))),
           h('h4', { style: { marginTop: '18px' } }, 'Personnel'),
           h('table', { class: 'ptable' },
             h('thead', {}, h('tr', {}, h('th', {}, 'Worker'), ...statCols.map(([n]) => h('th', {}, n)))),

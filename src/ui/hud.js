@@ -4,7 +4,9 @@ import { CARGO, BAYS, RIDERS, MAX_PLAYERS } from '../../shared/constants.js';
 import { ZONES, CONVEYORS, PADS, SKY_DOCK, BOUNDS } from '../../shared/level.js';
 import { lockerSheet, openSheet } from './menu.js';
 
-export const ICON = { crate: '📦', wobble: '🛢️', gnome: '🧙', beans: '🫘', balloon: '🎈', magnet: '🧲', mystery: '❓', duck: '🦆' };
+// cargo icons are rendered from the real 3D models (emoji differ per OS, and some are missing)
+let iconApp = null;
+export function cargoIcon(type, cls = '') { return iconApp ? h('img', { class: `cargo-ic ${cls}`, src: iconApp.renderer.cargoIcon(type), alt: type }) : ''; }
 const ICON_BG = { crate: '#9fb3bd', wobble: '#ffb38a', gnome: '#bcd4ff', beans: '#ffe08a', balloon: '#ffd1e6', magnet: '#c7d2da', mystery: '#d9c8ff' };
 const FIX_HINT = {
   jam: 'Hold USE at the belt service hatch — or slam the zone E-STOP',
@@ -34,6 +36,23 @@ const TIPS = [
   'Junk ducks clog belts. Feed them to the incinerator for a little recycling money.',
 ];
 
+// stadium-style 7-segment board: unlit "8" segments behind the lit digits
+function scoreboard(label, color, ghost) {
+  const lit = h('span', { class: 'lit' });
+  const gh = h('span', { class: 'ghost' }, ghost);
+  const el = h('div', { class: `board ${color}` }, h('div', { class: 'board-label' }, label), h('div', { class: 'board-face' }, gh, lit));
+  el._lit = lit; el._ghost = gh;
+  return el;
+}
+function setBoard(el, text, width) {
+  // DSEG uses "!" as a blank of digit width; ":" and "." are narrow and shared with the ghost
+  const t = text.length >= width ? text : '!'.repeat(width - text.length) + text;
+  if (el._lit.textContent !== t) {
+    el._lit.textContent = t;
+    el._ghost.textContent = t.replace(/[0-9!-]/g, '8');
+  }
+}
+
 const SVG_RING = (p) => {
   const r = 12, c = 2 * Math.PI * r;
   return `<svg class="ring" viewBox="0 0 30 30"><circle cx="15" cy="15" r="${r}" fill="rgba(27,31,36,.85)" stroke="#2b333a" stroke-width="5"/><circle cx="15" cy="15" r="${r}" fill="none" stroke="#ffc93c" stroke-width="5" stroke-dasharray="${c * p} ${c}" transform="rotate(-90 15 15)" stroke-linecap="round"/></svg>`;
@@ -42,6 +61,7 @@ const SVG_RING = (p) => {
 export class Hud {
   constructor(app) {
     this.app = app;
+    iconApp = app;
     this.root = h('div', { class: 'screen passthrough' });
     this.world = document.getElementById('world-ui');
     this.mode = null;
@@ -129,7 +149,7 @@ export class Hud {
           h('span', { class: 'hazard-meter', title: 'Hazard' }, [0, 1, 2, 3].map((i) => h('i', { class: i <= c.hazard ? 'on' : '' })))),
         h('div', { style: { fontSize: '13px', marginTop: '6px' } }, c.blurb),
         h('div', { class: 'lines' }, Object.entries(c.lines).map(([t, n]) => h('div', { class: 'order-line' },
-          h('span', { class: 'ic', style: { background: ICON_BG[t] } }, ICON[t]),
+          h('span', { class: 'ic', style: { background: ICON_BG[t] } }, cargoIcon(t)),
           h('span', {}, CARGO[t].short, h('span', { class: 'bay', style: { background: t === 'mystery' ? '#8b5cf6' : BAYS[CARGO[t].bay].color } }, t === 'mystery' ? '?' : CARGO[t].bay)),
           h('span', { class: 'cnt' }, `×${n}`)))),
         h('div', { class: 'meta' },
@@ -160,9 +180,9 @@ export class Hud {
     this.root.innerHTML = '';
     this.sh = {};
     this.sh.manifest = h('div', { class: 'paper' });
-    this.sh.time = h('div', { class: 'lcd' }, '0:00');
+    this.sh.time = scoreboard('TIME LEFT', 'amber', '88:88');
     this.sh.phase = h('div', { class: 'phase' }, 'SHIFT');
-    this.sh.money = h('div', { class: 'lcd amber' }, '$0');
+    this.sh.money = scoreboard('EARNINGS  $', 'green', '888888');
     this.sh.mult = h('span', { class: 'dymo red' }, '×1.00');
     this.sh.alerts = h('div', { class: 'alerts' });
     this.sh.hotline = h('div', {});
@@ -190,7 +210,7 @@ export class Hud {
     if (sh.keys.m !== mkey) {
       sh.keys.m = mkey;
       const line = ([t, need, done]) => h('div', { class: `order-line${done >= need ? ' done' : ''}` },
-        h('span', { class: 'ic', style: { background: ICON_BG[t] } }, ICON[t]),
+        h('span', { class: 'ic', style: { background: ICON_BG[t] } }, cargoIcon(t)),
         h('span', {}, CARGO[t].short, h('span', { class: 'bay', style: { background: t === 'mystery' ? '#8b5cf6' : BAYS[CARGO[t].bay].color } }, t === 'mystery' ? 'SCAN' : CARGO[t].bay)),
         h('span', { class: 'cnt' }, `${Math.min(done, need)}/${need}`));
       sh.manifest.innerHTML = '';
@@ -203,14 +223,15 @@ export class Hud {
     }
     // clock
     const tl = g.tl;
-    sh.time.textContent = clock(tl);
-    sh.time.className = `lcd${tl < 30 ? ' red' : tl < 60 ? ' amber' : ''}`;
+    setBoard(sh.time, clock(tl), 5);
+    sh.time.classList.toggle('red', tl < 30);
+    sh.time.classList.toggle('blink', tl < 10 && g.ph === 'shift');
     if (tl < 10 && Math.ceil(tl) !== sh.keys.beep) { sh.keys.beep = Math.ceil(tl); this.app.audio.play('beep'); }
-    sh.phase.textContent = g.ph === 'ending' ? 'SHIFT OVER' : g.ot ? (g.otDone ? `OVERTIME #${g.ot} DONE` : `OVERTIME #${g.ot}`) : g.qm ? 'QUOTA MET — BONUS TIME' : 'TIME LEFT';
+    sh.phase.textContent = g.ph === 'ending' ? 'SHIFT OVER' : g.ot ? (g.otDone ? `OVERTIME #${g.ot} DONE` : `OVERTIME #${g.ot}`) : g.qm ? 'QUOTA MET — BONUS TIME' : '';
     // money
     if (g.money !== this.lastMoney) {
-      sh.money.textContent = money(g.money);
-      sh.money.classList.toggle('neg', g.money < 0);
+      setBoard(sh.money, String(Math.round(g.money)), 6);
+      sh.money.classList.toggle('red', g.money < 0);
       sh.money.classList.remove('bump'); void sh.money.offsetWidth; sh.money.classList.add('bump');
       this.lastMoney = g.money;
     }

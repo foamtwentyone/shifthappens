@@ -49,7 +49,8 @@ export class Game {
     this.buildControls();
   }
 
-  tier() { return Math.min(3, Math.floor(this.ledger / 1500)); }
+  // a shift can end in the red; debt never locks the contract board
+  tier() { return Math.max(0, Math.min(3, Math.floor(this.ledger / 1500))); }
 
   makeContracts() {
     const tier = this.tier();
