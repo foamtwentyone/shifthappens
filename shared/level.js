@@ -91,7 +91,7 @@ export const TUBE = {
 };
 export const LIFT = { x0: 16, x1: 19, z0: -9.6, z1: -6.4, low: 0, high: 2.8 };
 export const FAN = { x: 24.6, z: -3.4, r: 1.15 };
-export const MAGNET = { x: 28.2, y: 4.7, z: -6.2, r: 7.5 };
+export const MAGNET = { x: 26.2, y: 4.8, z: -7.1, r: 8 };
 export const HEATPAD = { x: -10.5, z: 5.2, r: 1.0 };
 export const INCINERATOR = { x: -20, z: -8.6, r: 1.1 };
 export const BOILER = { x: 0, z: -18.2 };

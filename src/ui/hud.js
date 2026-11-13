@@ -19,6 +19,21 @@ const FIX_HINT = {
   flip: 'Cores repel each other. Wait it out or E-STOP the dock',
 };
 
+const TIPS = [
+  'Press the big red REQUEST button in the Intake to get cargo — or flip AUTO-FEED on.',
+  'Badges tell you where cargo goes: A and B are floor bays in the Dock, C is up on the SKY DOCK.',
+  'Belt B stops at the AIRLOCK. Someone has to CYCLE it — people too!',
+  'Thermo Beans only ship TOASTED: park them under the heat lamp in the Sorting Hall first.',
+  'Mystery boxes reveal their bay when they ride Belt A under the scanner.',
+  'The boiler only shows its pressure on the gauge in the Control Room. Somebody go look.',
+  'Higher boiler pressure = faster belts, tube and fan… and a bigger bang.',
+  'Steel crates are heavy: grab one with a friend, then THROW together to heave it.',
+  'Sky Dock routes: the Lift, the Pneumatic Tube, the Updraft Fan or the Magnet. Pick your poison.',
+  'You can pick up your colleagues. And throw them. HR has been notified.',
+  'Big red E-STOP clears a zone\'s breakdowns instantly — for $25 and four seconds of silence.',
+  'Junk ducks clog belts. Feed them to the incinerator for a little recycling money.',
+];
+
 const SVG_RING = (p) => {
   const r = 12, c = 2 * Math.PI * r;
   return `<svg class="ring" viewBox="0 0 30 30"><circle cx="15" cy="15" r="${r}" fill="rgba(27,31,36,.85)" stroke="#2b333a" stroke-width="5"/><circle cx="15" cy="15" r="${r}" fill="none" stroke="#ffc93c" stroke-width="5" stroke-dasharray="${c * p} ${c}" transform="rotate(-90 15 15)" stroke-linecap="round"/></svg>`;
@@ -94,6 +109,7 @@ export class Hud {
       for (const p of state.pl) {
         this.lob.roster.append(h('div', { class: `card-worker${p.c ? '' : ' off'}` },
           mine.includes(p.id) ? h('span', { class: 'dymo yellow you' }, mine.length > 1 ? `P${mine.indexOf(p.id) + 1}` : 'YOU') : null,
+          mine.indexOf(p.id) > 0 ? h('button', { class: 'kick interactive', title: 'Send this couch worker home', onclick: () => { app.audio.play('paper'); app.session.removeLocal(p.id); } }, '✕') : null,
           h('img', { class: 'portrait', src: app.renderer.portrait(p.o, p.slot ?? p.id) }),
           h('div', { class: 'nm' }, p.n),
           h('div', { class: 'st' }, !p.c ? h('span', { class: 'dymo' }, 'RECONNECTING') : p.r ? h('span', { class: 'dymo teal' }, '✓ PUNCHED IN') : h('span', { class: 'dymo red' }, 'NOT READY'))));
@@ -152,11 +168,14 @@ export class Hud {
     this.sh.hotline = h('div', {});
     this.sh.map = h('canvas', { width: 480, height: 230 });
     this.sh.banner = h('div', { class: 'center-banner' });
+    this.sh.tip = h('div', { class: 'tip' });
+    this.tipI = Math.floor(Math.random() * TIPS.length);
+    this.tipT = 0;
     this.root.append(h('div', { class: 'hud' },
       h('div', { class: 'manifest clipboard' }, this.sh.manifest),
       h('div', { class: 'clock' }, this.sh.time, this.sh.phase),
       h('div', { class: 'wallet' }, this.sh.money, h('div', { class: 'row', style: { gap: '6px' } }, this.sh.mult)),
-      this.sh.alerts, this.sh.hotline,
+      this.sh.alerts, this.sh.hotline, this.sh.tip,
       h('div', { class: 'minimap plate dark no-rivets', style: { padding: '8px' } }, this.sh.map),
       this.sh.banner));
     this.sh.keys = {};
@@ -230,6 +249,16 @@ export class Hud {
       sh.banner.innerHTML = '';
       if (g.ph === 'ending') sh.banner.append(h('div', { class: 'big' }, g.res === 'QUOTA MISSED' || g.res === 'OVERTIME BUST' ? 'WHISTLE!' : 'CLOCKED OUT!'), h('div', { class: 'small' }, g.res || ''));
     }
+    // rotating safety tips (hidden while the hotline rings)
+    this.tipT -= dt;
+    if (this.tipT <= 0) {
+      this.tipT = 11;
+      this.tipI = (this.tipI + 1) % TIPS.length;
+      sh.tip.innerHTML = '';
+      sh.tip.append(h('span', { class: 'dymo yellow' }, 'SAFETY TIP'), h('span', { class: 'tx' }, TIPS[this.tipI]));
+      sh.tip.classList.remove('fade-in'); void sh.tip.offsetWidth; sh.tip.classList.add('fade-in');
+    }
+    sh.tip.style.display = showHot || g.ph !== 'shift' ? 'none' : '';
     // minimap
     this.mapT -= dt;
     if (this.mapT <= 0) { this.mapT = 0.1; this.drawMap(state); }

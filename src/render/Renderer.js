@@ -157,11 +157,14 @@ export class Renderer {
     // window frame between desk and plant
     const fr = new THREE.Group();
     const fm = mat('#1b2a30', { rough: 0.6 });
-    fr.add(M(new THREE.BoxGeometry(34, 0.5, 0.6), fm, 0, -0.45, -2.2));
     g.add(fr);
-    g.position.set(-5.2, 14.7, 24.6);
-    g.rotation.x = 0.12;
-    this.scene.add(g);
+    // the desk rides with the menu camera so the composition is always the same:
+    // manager's desk in the foreground, the running plant out of the window
+    g.position.set(0.3, -2.42, -6.3);
+    g.rotation.x = 0.62;
+    g.scale.setScalar(0.9);
+    this.scene.add(this.camera);
+    this.camera.add(g);
     g.visible = true;
   }
 
@@ -284,7 +287,7 @@ export class Renderer {
       this.level.update(this.demoPlant, { ph: 'menu', riders: {}, contracts: null, ledger: 0, shifts: 0, tier: 0 }, dt, t);
       const sway = Math.sin(t * 0.15) * 1.2;
       this.camGoal = { pos: new THREE.Vector3(-6 + sway, 19.5, 31), target: new THREE.Vector3(-4 + sway * 0.6, 0, -4) };
-      if (Math.random() < dt * 2) this.fx.steam(this.mug.position.x + this.desk.position.x, this.desk.position.y + 0.9, this.desk.position.z + this.mug.position.z, 1, 0.6);
+      if (Math.random() < dt * 2) { const wp = this.mug.getWorldPosition(new THREE.Vector3()); this.fx.steam(wp.x, wp.y + 0.6, wp.z, 1, 0.6); }
       this.ambientFx(this.demoPlant, null, dt);
     } else if (state) {
       this.syncPlayers(state, dt, localIds);
@@ -336,7 +339,7 @@ export class Renderer {
     const plant = state.plant, game = state.game;
     const dark = !!game?.dark;
     const black = !plant.main;
-    const target = black ? 0.12 : dark ? 0.1 : 1;
+    const target = black ? 0.12 : dark ? 0.02 : 1;
     this.lightLevel += (target - this.lightLevel) * Math.min(1, dt * 3);
     const L = this.lightLevel;
     this.hemi.intensity = 0.12 + 1.03 * L;

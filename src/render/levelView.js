@@ -374,8 +374,8 @@ export class LevelView {
       // frame + lamp
       const fr = new THREE.Group();
       fr.position.set(d.x, 0, (d.z0 + d.z1) / 2);
-      for (const s of [-1, 1]) fr.add(M(box(0.6, d.h + 0.4, 0.3), mat(PAL.ink), 0, (d.h + 0.4) / 2, s * (w / 2 + 0.1)));
-      fr.add(M(box(0.6, 0.4, w + 0.5), mat(PAL.ink), 0, d.h + 0.4, 0));
+      for (const s of [-1, 1]) fr.add(M(rb(0.6, d.h + 0.4, 0.3, 0.06), mat('#2c4a52'), 0, (d.h + 0.4) / 2, s * (w / 2 + 0.1)));
+      fr.add(M(rb(0.6, 0.4, w + 0.5, 0.08), mat(PAL.yellow), 0, d.h + 0.4, 0));
       const lamp = M(cyl(0.16, 0.16, 0.18, 12), uniqueMat('#333', { emissive: '#000' }), 0, d.h + 0.75, 0);
       fr.add(lamp);
       this.add(fr);

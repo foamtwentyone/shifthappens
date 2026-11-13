@@ -121,10 +121,17 @@ export class Sim {
     body.addEventListener('collide', (e) => this.collisions.push({ a: body, b: e.body, e }));
     this.world.addBody(body);
     const n = this.players.size;
+    // friends with identical saved outfits still get told apart
+    const used = new Set([...this.players.values()].map((q) => q.outfit.color));
+    if (outfit && used.has(outfit.color)) {
+      outfit = { ...outfit, color: OUTFIT_COLORS.find((c) => !used.has(c)) ?? outfit.color };
+      const hats = new Set([...this.players.values()].map((q) => q.outfit.hat));
+      if (hats.has(outfit.hat)) outfit.hat = HATS.find((h) => !hats.has(h)) ?? outfit.hat;
+    }
     const p = {
       id, name: (name || `Worker ${n + 1}`).slice(0, 14), body, slot: slot ?? n,
       outfit: {
-        color: outfit?.color ?? OUTFIT_COLORS[(n * 3) % OUTFIT_COLORS.length],
+        color: outfit?.color ?? OUTFIT_COLORS.find((c) => !used.has(c)) ?? OUTFIT_COLORS[n % OUTFIT_COLORS.length],
         hat: outfit?.hat ?? HATS[n % HATS.length],
         face: outfit?.face ?? FACES[n % FACES.length],
       },

@@ -186,3 +186,50 @@ test('disconnect keeps the worker for a grace period, reconnect restores it', ()
   run(room, 31);
   assert.equal(room.sim.players.size, 0);
 });
+
+test('lift carries a worker up to the sky dock', () => {
+  const { room } = makeRoom();
+  const pid = room.join('c1', {}).pid;
+  startShift(room);
+  const sim = room.sim;
+  const p = sim.players.get(pid);
+  p.body.position.set(17.5, 0.6, -8); p.body.velocity.set(0, 0, 0);
+  run(room, 0.5);
+  sim.plant.toggleLift();
+  run(room, 3);
+  assert.ok(p.body.position.y > 3.0, `worker on lift at y=${p.body.position.y}`);
+});
+
+test('updraft fan floats helium parcels onto the sky dock', () => {
+  const { room } = makeRoom();
+  room.join('c1', {});
+  startShift(room);
+  const sim = room.sim;
+  const c = sim.spawnCargo('balloon', [24.6, 0.8, -3.4]);
+  run(room, 6);
+  const p = c.body.position;
+  assert.ok(!sim.cargo.has(c.id) || (p.y > 2.7 && p.z < -5), `balloon at ${p.x.toFixed(1)},${p.y.toFixed(1)},${p.z.toFixed(1)}`);
+});
+
+test('magnet hoists cores up and drops them on the sky dock', () => {
+  const { room } = makeRoom();
+  room.join('c1', {});
+  startShift(room);
+  const sim = room.sim;
+  const c = sim.spawnCargo('magnet', [26, 0.5, -2.5]);
+  sim.plant.magnet.on = true;
+  run(room, 4);
+  assert.ok(c.body.position.y > 3.2, `core pulled up to y=${c.body.position.y.toFixed(2)}`);
+  sim.plant.magnet.on = false;
+  run(room, 3);
+  assert.ok(!sim.cargo.has(c.id) || c.body.position.y > 2.7, 'core landed on the sky dock (or shipped)');
+});
+
+test('online friends with the same saved outfit get distinct colours', () => {
+  const { room } = makeRoom();
+  const o = { color: '#ff7a2f', hat: 'hardhat', face: 'happy' };
+  room.join('a', { outfit: { ...o } });
+  room.join('b', { outfit: { ...o } });
+  const [p1, p2] = [...room.sim.players.values()];
+  assert.notEqual(p1.outfit.color, p2.outfit.color);
+});
